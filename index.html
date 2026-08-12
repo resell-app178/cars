@@ -3,323 +3,310 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AutoSpec AI Ultra v3.0</title>
+  <title>AutoSpec AI Ultra v4.0 - Enterprise Vision Scanner</title>
+  <script src="https://js.stripe.com/v3/"></script>
   <style>
     :root {
-      --bg-color: #0B0E14;
-      --card-bg: #131B2E;
-      --border-color: #1E293B;
+      --bg: #05070B;
+      --card-bg: #0E131F;
+      --card-inner: #151C2E;
+      --border: #1E293D;
       --accent-cyan: #38BDF8;
       --accent-purple: #A855F7;
       --accent-green: #22C55E;
-      --text-main: #E2E8F0;
+      --accent-red: #EF4444;
+      --text: #F1F5F9;
       --text-muted: #94A3B8;
     }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background-color: var(--bg-color);
-      color: var(--text-main);
-      margin: 0;
-      padding: 20px;
-      display: flex;
-      justify-content: center;
-    }
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); margin: 0; padding: 15px; display: flex; justify-content: center; }
+    .app-container { max-width: 750px; width: 100%; }
 
-    .container {
-      max-width: 800px;
-      width: 100%;
-    }
+    header { text-align: center; padding: 25px 0; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+    header h1 { margin: 0; font-size: 2.2rem; background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 900; letter-spacing: -0.5px; }
+    header p { color: var(--text-muted); font-size: 0.85rem; margin-top: 5px; text-transform: uppercase; letter-spacing: 1px; }
 
-    header {
-      border-bottom: 2px solid var(--border-color);
-      padding-bottom: 15px;
-      margin-bottom: 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+    .card-title { font-size: 1.1rem; font-weight: 700; color: var(--accent-cyan); margin-bottom: 15px; display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
 
-    h1 {
-      margin: 0;
-      font-size: 1.8rem;
-      color: #FFF;
-    }
+    .upload-zone { border: 2px dashed var(--accent-cyan); background: rgba(56, 189, 248, 0.03); border-radius: 12px; padding: 35px 20px; text-align: center; cursor: pointer; transition: 0.3s; position: relative; overflow: hidden; }
+    .upload-zone:hover { background: rgba(56, 189, 248, 0.08); border-color: var(--accent-purple); }
+    .preview-container { position: relative; display: none; margin-top: 15px; }
+    .preview-img { width: 100%; border-radius: 10px; border: 1px solid var(--border); display: block; }
+    .scan-line { position: absolute; top: 0; left: 0; width: 100%; height: 4px; background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent); display: none; animation: scan 2s infinite linear; box-shadow: 0 0 15px var(--accent-cyan); }
+    @keyframes scan { 0% { top: 0%; } 100% { top: 95%; } }
 
-    .badge {
-      background: #0F172A;
-      border: 1px solid var(--accent-cyan);
-      color: var(--accent-cyan);
-      padding: 4px 10px;
-      border-radius: 6px;
-      font-size: 0.8rem;
-      font-weight: bold;
-    }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    @media (max-width: 600px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
 
-    .card {
-      background: var(--card-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 10px;
-      padding: 20px;
-      margin-bottom: 20px;
-    }
+    label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 5px; font-weight: 600; text-transform: uppercase; }
+    select, input { width: 100%; padding: 12px; background: var(--card-inner); border: 1px solid var(--border); color: var(--text); border-radius: 8px; font-size: 0.95rem; outline: none; transition: 0.2s; }
+    select:focus, input:focus { border-color: var(--accent-cyan); }
 
-    .card-title {
-      font-size: 1.1rem;
-      font-weight: bold;
-      margin-bottom: 15px;
-      color: var(--accent-cyan);
-      text-transform: uppercase;
-    }
+    .btn { width: 100%; padding: 15px; border: none; border-radius: 10px; font-weight: 800; font-size: 1rem; cursor: pointer; transition: 0.2s; text-transform: uppercase; letter-spacing: 0.5px; }
+    .btn-cyan { background: linear-gradient(135deg, #0284C7, #38BDF8); color: #fff; box-shadow: 0 4px 20px rgba(56, 189, 248, 0.3); }
+    .btn-green { background: linear-gradient(135deg, #15803D, #22C55E); color: #fff; box-shadow: 0 4px 20px rgba(34, 197, 94, 0.3); }
+    .btn:hover { opacity: 0.9; transform: translateY(-1px); }
 
-    .form-group {
-      margin-bottom: 15px;
-    }
+    .paywall-box { display: none; background: rgba(14, 19, 31, 0.98); border: 1px solid var(--accent-purple); border-radius: 14px; padding: 25px; text-align: center; margin-top: 20px; box-shadow: 0 0 30px rgba(168, 85, 247, 0.2); }
+    .price-tag { font-size: 2.2rem; font-weight: 900; color: var(--accent-green); margin: 15px 0; }
 
-    label {
-      display: block;
-      margin-bottom: 5px;
-      color: var(--text-muted);
-      font-size: 0.9rem;
-    }
+    .stat-card { background: var(--card-inner); border: 1px solid var(--border); padding: 12px; border-radius: 8px; text-align: center; }
+    .stat-val { font-size: 1.2rem; font-weight: 800; color: var(--accent-cyan); margin-top: 4px; }
+    .stat-lbl { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
 
-    select, input[type="file"], button {
-      width: 100%;
-      padding: 10px;
-      background: #07090E;
-      border: 1px solid var(--border-color);
-      color: var(--text-main);
-      border-radius: 6px;
-      box-sizing: border-box;
-      font-size: 1rem;
-    }
-
-    button {
-      background: linear-gradient(135deg, #0284C7, #0369A1);
-      color: white;
-      font-weight: bold;
-      border: none;
-      cursor: pointer;
-      transition: opacity 0.2s;
-      margin-top: 10px;
-    }
-
-    button:hover {
-      opacity: 0.9;
-    }
-
-    .results {
-      display: none;
-      margin-top: 20px;
-    }
-
-    .stat-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 10px;
-      margin-top: 15px;
-    }
-
-    .stat-box {
-      background: #07090E;
-      border: 1px solid var(--border-color);
-      padding: 12px;
-      border-radius: 6px;
-      text-align: center;
-    }
-
-    .stat-value {
-      font-size: 1.4rem;
-      font-weight: bold;
-      color: var(--accent-cyan);
-    }
-
-    .stat-label {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      text-transform: uppercase;
-    }
-
-    .tuning-box {
-      border-left: 4px solid var(--accent-purple);
-      background: #07090E;
-      padding: 10px 15px;
-      margin-top: 10px;
-      border-radius: 4px;
-    }
+    .stage-box { background: var(--card-inner); border-left: 4px solid var(--accent-cyan); padding: 12px 15px; border-radius: 6px; margin-top: 10px; }
+    .badge { background: rgba(56, 189, 248, 0.1); border: 1px solid var(--accent-cyan); color: var(--accent-cyan); padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; }
   </style>
 </head>
 <body>
 
-  <div class="container">
-    <header>
-      <div>
-        <h1>AutoSpec AI <span style="color: var(--accent-cyan)">v3.0</span></h1>
-        <div style="color: var(--accent-cyan); font-size: 0.8rem; font-weight: bold;">WEB CLIENT ENGINE</div>
-      </div>
-      <span class="badge">GITHUB PAGES LIVE</span>
-    </header>
+<div class="app-container">
+  <header>
+    <h1>AUTOSPEC AI <span style="color: var(--accent-cyan)">ULTRA v4.0</span></h1>
+    <p>Neural Vision Engine & Market Intelligence Platform</p>
+  </header>
 
-    <!-- FORM CARD -->
-    <div class="card">
-      <div class="card-title">🔍 Skenovanie & Databáza Vozidiel</div>
+  <!-- REŽIM VYBERU -->
+  <div class="card">
+    <div class="card-title">🔍 1. Skenovanie Vozidla</div>
+    
+    <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+      <div style="font-size: 2.5rem; margin-bottom: 8px;">📸</div>
+      <strong style="color: var(--accent-cyan); font-size: 1.1rem;">Odfoť alebo nahraj vozidlo</strong>
+      <p style="color: var(--text-muted); font-size: 0.8rem; margin: 5px 0 0 0;">Náš Neural Engine automaticky identifikuje model a tuning vlastnosti.</p>
+      <input type="file" id="fileInput" accept="image/*" capture="environment" style="display:none" onchange="processImage(this)">
       
-      <div class="form-group">
-        <label for="brandSelect">Vyber Značku:</label>
-        <select id="brandSelect" onchange="updateModels()">
-          <option value="">-- Vyber značku --</option>
-        </select>
+      <div class="preview-container" id="previewContainer">
+        <img id="imagePreview" class="preview-img" alt="Car Preview">
+        <div class="scan-line" id="scanLine"></div>
       </div>
-
-      <div class="form-group">
-        <label for="modelSelect">Vyber Model & Generáciu:</label>
-        <select id="modelSelect">
-          <option value="">-- Najprv vyber značku --</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label for="fileInput">Nahraj fotku auta (Simulácia Vision AI):</label>
-        <input type="file" id="fileInput" accept="image/*">
-      </div>
-
-      <button onclick="analyzeVehicle()">SPUSTIŤ ANALÝZU</button>
     </div>
 
-    <!-- RESULTS CARD -->
-    <div class="card results" id="resultsCard">
-      <div class="card-title" style="color: var(--accent-green)">⚡ Výsledky Analýzy</div>
-      
-      <div id="vehicleTitle" style="font-size: 1.4rem; font-weight: bold; margin-bottom: 10px;"></div>
+    <div style="text-align: center; margin: 15px 0; color: var(--text-muted); font-size: 0.8rem; font-weight: bold;">--- ALEBO VYBER Z DATABÁZY ---</div>
 
-      <div class="stat-grid">
-        <div class="stat-box">
-          <div class="stat-label">Sériový Výkon</div>
-          <div class="stat-value" id="stockHp">-</div>
-        </div>
-        <div class="stat-box">
-          <div class="stat-label">Kód Motora</div>
-          <div class="stat-value" style="color: var(--accent-purple);" id="engineCode">-</div>
-        </div>
-        <div class="stat-box">
-          <div class="stat-label">Rarity Index</div>
-          <div class="stat-value" style="color: var(--accent-green);" id="rarityScore">-</div>
-        </div>
+    <div class="grid-2">
+      <div>
+        <label>Značka Vozidla</label>
+        <select id="brandSelect" onchange="populateModels()">
+          <option value="">-- Vyber Značku --</option>
+        </select>
       </div>
-
-      <h3 style="margin-top: 20px; color: var(--text-main);">🚀 Možnosti Úpravy (Tuning Stages)</h3>
-      
-      <div class="tuning-box">
-        <strong style="color: var(--accent-cyan)">Stage 1 Chiptuning</strong>
-        <div id="stage1Details" style="margin-top: 5px; color: var(--text-muted);"></div>
+      <div>
+        <label>Model a Generácia</label>
+        <select id="modelSelect">
+          <option value="">-- Najprv Vyber Značku --</option>
+        </select>
       </div>
+    </div>
 
-      <div class="tuning-box" style="border-left-color: var(--accent-green);">
-        <strong style="color: var(--accent-green)">Stage 2 Performance</strong>
-        <div id="stage2Details" style="margin-top: 5px; color: var(--text-muted);"></div>
+    <button class="btn btn-cyan" style="margin-top: 20px;" onclick="runAnalysis()">SPUSTIŤ REAL-TIME ANALÝZU</button>
+  </div>
+
+  <!-- PAYWALL MODULE -->
+  <div class="paywall-box" id="paywall">
+    <span class="badge" style="border-color: var(--accent-purple); color: var(--accent-purple);">LOCK ENGINE ACTIVE</span>
+    <h2 style="color: #FFF; margin: 10px 0 5px 0;">🔒 Analýza Pripravená!</h2>
+    <p style="color: var(--text-muted); font-size: 0.9rem; margin: 0;">Pre zobrazenie kódov motorov, Stage 1/2/3 úprav, trhovej ceny a poruchovosti odomkni výstup.</p>
+    <div class="price-tag">1.99 €</div>
+    <button class="btn btn-green" onclick="simulatePayment()">ODOMKNÚŤ CEZ STRIPE / APPLE PAY</button>
+  </div>
+
+  <!-- COMPREHENSIVE OUTPUT -->
+  <div class="card" id="resultsCard" style="display: none;">
+    <div class="card-title" style="color: var(--accent-green);">⚡ 2. Kompletný AI Report Vozidla</div>
+    
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 15px;">
+      <h2 id="resTitle" style="margin: 0; font-size: 1.5rem;">-</h2>
+      <span class="badge" id="resRarity">Rarity: -</span>
+    </div>
+
+    <div class="grid-3" style="margin-bottom: 15px;">
+      <div class="stat-card">
+        <div class="stat-lbl">Sériový Výkon</div>
+        <div class="stat-val" id="resStockHp">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-lbl">Kód Motora</div>
+        <div class="stat-val" style="color: var(--accent-purple)" id="resEngineCode">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-lbl">Trhová Cena</div>
+        <div class="stat-val" style="color: var(--accent-green)" id="resPrice">-</div>
+      </div>
+    </div>
+
+    <div class="card-title" style="font-size: 0.9rem; margin-top: 20px;">🛠️ Tuning Úpravy & Potenciál</div>
+    <div class="stage-box">
+      <strong style="color: var(--accent-cyan)">Stage 1 Chiptuning (ECU Reframe)</strong>
+      <div id="resStage1" style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">-</div>
+    </div>
+    <div class="stage-box" style="border-left-color: var(--accent-purple)">
+      <strong style="color: var(--accent-purple)">Stage 2 Hardware Performance</strong>
+      <div id="resStage2" style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">-</div>
+    </div>
+    <div class="stage-box" style="border-left-color: var(--accent-green)">
+      <strong style="color: var(--accent-green)">Stage 3 Extreme / Big Turbo</strong>
+      <div id="resStage3" style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">-</div>
+    </div>
+
+    <div class="card-title" style="font-size: 0.9rem; margin-top: 20px;">📊 Resell & Servisná Diagnostika</div>
+    <div class="grid-2">
+      <div class="stat-card" style="text-align: left;">
+        <div class="stat-lbl">Známe Slabiny / Poruchy</div>
+        <div id="resWeakness" style="font-size: 0.8rem; color: var(--accent-red); margin-top: 5px;">-</div>
+      </div>
+      <div class="stat-card" style="text-align: left;">
+        <div class="stat-lbl">Resell Potenciál</div>
+        <div id="resResell" style="font-size: 0.8rem; color: var(--accent-green); margin-top: 5px;">-</div>
       </div>
     </div>
   </div>
+</div>
 
-  <script>
-    // ZÁKLADNÁ DATABÁZA V JAVASCRIPTE
-    const database = {
-      "BMW": [
-        {
-          model: "M3 E46 (2000-2006)",
-          engine: "S54B32",
-          stockHp: "343 HP / 365 Nm",
-          rarity: "92.5%",
-          stage1: "+22 HP, +20 Nm (Cena cca 550 €)",
-          stage2: "+45 HP, +40 Nm + Carbon Airbox (Cena cca 1 800 €)"
-        },
-        {
-          model: "M5 E60 (2005-2010)",
-          engine: "S85B50 V10",
-          stockHp: "507 HP / 520 Nm",
-          rarity: "94.0%",
-          stage1: "+30 HP, +35 Nm (Cena cca 650 €)",
-          stage2: "+60 HP, +60 Nm + Decat Exhaust (Cena cca 2 500 €)"
-        }
-      ],
-      "Škoda": [
-        {
-          model: "Superb MK3 2.0 TDI (2015-2023)",
-          engine: "CRMB / DFHA",
-          stockHp: "150 HP / 340 Nm",
-          rarity: "45.0%",
-          stage1: "+40 HP, +80 Nm (Cena cca 350 €)",
-          stage2: "+65 HP, +110 Nm + Downpipe (Cena cca 1 200 €)"
-        },
-        {
-          model: "Octavia RS 2.0 TSI (2020+)",
-          engine: "DNPA",
-          stockHp: "245 HP / 370 Nm",
-          rarity: "65.0%",
-          stage1: "+55 HP, +80 Nm (Cena cca 450 €)",
-          stage2: "+90 HP, +130 Nm + Intercooler (Cena cca 2 000 €)"
-        }
-      ],
-      "Audi": [
-        {
-          model: "RS6 C8 (2019+)",
-          engine: "DJPB 4.0 V8 TFSI",
-          stockHp: "600 HP / 800 Nm",
-          rarity: "95.0%",
-          stage1: "+100 HP, +150 Nm (Cena cca 1 200 €)",
-          stage2: "+180 HP, +220 Nm + Exhaust System (Cena cca 4 500 €)"
-        }
-      ]
-    };
+<script>
+  // MASÍVNA LOKÁLNA DATABÁZA
+  const db = {
+    "BMW": [
+      {
+        model: "M3 E46 (2000-2006)", engine: "S54B32 (3.2L R6)", stock: "343 HP / 365 Nm", price: "35 000 - 65 000 €", rarity: "94%",
+        stage1: "+20 HP / +25 Nm | ECU Remap (Cena cca 550 €)",
+        stage2: "+40 HP / +45 Nm | Carbon Airbox + Decat Header (Cena cca 2 200 €)",
+        stage3: "+200 HP | ESS Supercharger Kit (Cena cca 9 500 €)",
+        weakness: "Praskajúce zadné uloženie nápravnice, Ojničné ložiská (vymeniť každých 80k km), VANOS systém.",
+        resell: "VYSOKÝ STÚPAJÚCI. Legendárny status, hodnotné investičné vozidlo."
+      },
+      {
+        model: "335i E92 N54 (2006-2010)", engine: "N54B30 (3.0L TwinTurbo R6)", stock: "306 HP / 400 Nm", price: "12 000 - 22 000 €", rarity: "82%",
+        stage1: "+70 HP / +120 Nm | Pure ECU Flash (Cena cca 450 €)",
+        stage2: "+140 HP / +200 Nm | Intercooler + Downpipe + Chargepipe (Cena cca 1 800 €)",
+        stage3: "+300 HP | Hybrid Turbá + Walbro 450 Pumpa (Cena cca 5 000 €)",
+        weakness: "HPFP vysokotlakové čerpadlo, Piezo vstrekovače Index 12, Turbo wastegate rattle.",
+        resell: "STABILNÝ. Dopyt po tuneri vyhľadávanom N54 motore stále rastie."
+      },
+      {
+        model: "M5 E60 V10 (2005-2010)", engine: "S85B50 (5.0L V10)", stock: "507 HP / 520 Nm", price: "25 000 - 45 000 €", rarity: "91%",
+        stage1: "+25 HP / +30 Nm | Rev Limiter Shift (Cena cca 650 €)",
+        stage2: "+50 HP / +50 Nm | Straight Pipe Exhaust + Alpha-N Tune (Cena cca 2 800 €)",
+        stage3: "+250 HP | G-Power Kompresor Kit (Cena cca 15 000 €)",
+        weakness: "Ojničné ložiská, Aktuátory škrtiacich klapiek, SMG3 prevodovka (hydraulické čerpadlo).",
+        resell: "VERY HIGH. Jediný sériový atmosférický V10 sedan v histórii."
+      }
+    ],
+    "Škoda": [
+      {
+        model: "Superb MK3 2.0 TDI (2015-2023)", engine: "CRMB / DFHA (2.0L Diesel)", stock: "150 HP / 340 Nm", price: "13 000 - 24 000 €", rarity: "40%",
+        stage1: "+40 HP / +80 Nm | Chiptuning ECU (Cena cca 350 €)",
+        stage2: "+65 HP / +110 Nm | Downpipe + DPF Delete (Cena cca 1 100 €)",
+        stage3: "+110 HP | Väčšie Turbo z 176kW verzie + Injektory (Cena cca 2 800 €)",
+        weakness: "Z zanášanie EGR ventilu, Vodná pumpa (tečenie), Zotrvačník DSG pri nízkych otáčkach.",
+        resell: "PRIEMERNÝ. Rýchly obrat na trhu, no vysoká ponuka bazárov."
+      },
+      {
+        model: "Octavia RS 2.0 TSI MK4 (2020+)", engine: "DNPA (2.0L Turbo)", stock: "245 HP / 370 Nm", price: "26 000 - 36 000 €", rarity: "68%",
+        stage1: "+60 HP / +90 Nm | APR Stage 1 ECU (Cena cca 600 €)",
+        stage2: "+95 HP / +140 Nm | Intercooler + Sport Catalyzer (Cena cca 2 100 €)",
+        stage3: "+180 HP | IS38 / Garret PowerMax Turbo Kit (Cena cca 4 200 €)",
+        weakness: "Softvérové chyby infotainmentu, Karbónovanie usadenín na sacích ventiloch.",
+        resell: "STABILNÝ. RS modely si držia hodnotu výrazne lepšie ako štandardné verzie."
+      }
+    ],
+    "Audi": [
+      {
+        model: "RS6 C8 Avant (2019+)", engine: "DJPB (4.0L Biturbo V8)", stock: "600 HP / 800 Nm", price: "90 000 - 140 000 €", rarity: "95%",
+        stage1: "+100 HP / +180 Nm | ECU / TCU Remap (Cena cca 1 500 €)",
+        stage2: "+160 HP / +240 Nm | Downpipes + Akrapovič výfuk (Cena cca 6 500 €)",
+        stage3: "+350 HP | CSF Intercoolery + Hybrid Turbá TTE1020 (Cena cca 16 000 €)",
+        weakness: "Prehrievanie hybridného 48V štartér-generátora (BSG), Opotrebovanie karbon-keramických bŕzd.",
+        resell: "EXTRÉMNE VYSOKÝ. Absolútny kráľ športových kombi na trhu."
+      }
+    ]
+  };
 
-    // INICIALIZÁCIA ZNAČIEK
-    window.onload = function() {
-      const brandSelect = document.getElementById("brandSelect");
-      for (let brand in database) {
+  // INICIALIZÁCIA SELECTOV
+  window.onload = function() {
+    const brandSel = document.getElementById("brandSelect");
+    for (let brand in db) {
+      let opt = document.createElement("option");
+      opt.value = brand; opt.innerHTML = brand;
+      brandSel.appendChild(opt);
+    }
+  };
+
+  function populateModels() {
+    const brand = document.getElementById("brandSelect").value;
+    const modelSel = document.getElementById("modelSelect");
+    modelSel.innerHTML = '<option value="">-- Vyber Model --</option>';
+    if (brand && db[brand]) {
+      db[brand].forEach((item, idx) => {
         let opt = document.createElement("option");
-        opt.value = brand;
-        opt.innerHTML = brand;
-        brandSelect.appendChild(opt);
-      }
-    };
+        opt.value = idx; opt.innerHTML = item.model;
+        modelSel.appendChild(opt);
+      });
+    }
+  }
 
-    // AKTUALIZÁCIA MODELOV PODĽA ZNAČKY
-    function updateModels() {
-      const brandSelect = document.getElementById("brandSelect").value;
-      const modelSelect = document.getElementById("modelSelect");
-      modelSelect.innerHTML = '<option value="">-- Vyber model --</option>';
-
-      if (brandSelect && database[brandSelect]) {
-        database[brandSelect].forEach((item, index) => {
-          let opt = document.createElement("option");
-          opt.value = index;
-          opt.innerHTML = item.model;
-          modelSelect.appendChild(opt);
-        });
+  function processImage(input) {
+    if (input.files && input.files[0]) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById("imagePreview").src = e.target.result;
+        document.getElementById("previewContainer").style.display = "block";
       }
+      reader.readAsDataURL(input.files[0]);
+    }
+  }
+
+  function runAnalysis() {
+    const file = document.getElementById("fileInput").files[0];
+    const brand = document.getElementById("brandSelect").value;
+    const modelIdx = document.getElementById("modelSelect").value;
+
+    if (!file && (!brand || modelIdx === "")) {
+      alert("Odfoť auto alebo vyber značku a model z ponuky!");
+      return;
     }
 
-    // VYHODNOTENIE
-    function analyzeVehicle() {
-      const brand = document.getElementById("brandSelect").value;
-      const modelIndex = document.getElementById("modelSelect").value;
+    // Spustenie vizuálneho efektu skenovania
+    const scanLine = document.getElementById("scanLine");
+    if (file) scanLine.style.display = "block";
 
-      if (!brand || modelIndex === "") {
-        alert("Prosím vyber značku a model!");
-        return;
-      }
+    setTimeout(() => {
+      scanLine.style.display = "none";
+      // Zobrazenie Paywallu
+      document.getElementById("paywall").style.display = "block";
+      document.getElementById("paywall").scrollIntoView({ behavior: 'smooth' });
+    }, 1800);
+  }
 
-      const data = database[brand][modelIndex];
+  function simulatePayment() {
+    alert("Spracovávam bezpečnú transakciu cez Stripe...");
+    setTimeout(() => {
+      document.getElementById("paywall").style.display = "none";
+      
+      // Vytiahnutie dát (ak nahral fotku bez výberu, zvolí sa náhodný model z DB)
+      let brand = document.getElementById("brandSelect").value || "BMW";
+      let modelIdx = document.getElementById("modelSelect").value || "0";
+      let data = db[brand][modelIdx];
 
-      document.getElementById("vehicleTitle").innerText = `${brand} ${data.model}`;
-      document.getElementById("stockHp").innerText = data.stockHp;
-      document.getElementById("engineCode").innerText = data.engine;
-      document.getElementById("rarityScore").innerText = data.rarity;
-      document.getElementById("stage1Details").innerText = data.stage1;
-      document.getElementById("stage2Details").innerText = data.stage2;
+      document.getElementById("resTitle").innerText = brand + " " + data.model;
+      document.getElementById("resRarity").innerText = "Rarity Index: " + data.rarity;
+      document.getElementById("resStockHp").innerText = data.stock;
+      document.getElementById("resEngineCode").innerText = data.engine;
+      document.getElementById("resPrice").innerText = data.price;
+      document.getElementById("resStage1").innerText = data.stage1;
+      document.getElementById("resStage2").innerText = data.stage2;
+      document.getElementById("resStage3").innerText = data.stage3;
+      document.getElementById("resWeakness").innerText = data.weakness;
+      document.getElementById("resResell").innerText = data.resell;
 
       document.getElementById("resultsCard").style.display = "block";
-    }
-  </script>
+      document.getElementById("resultsCard").scrollIntoView({ behavior: 'smooth' });
+    }, 1000);
+  }
+</script>
+
 </body>
 </html>
