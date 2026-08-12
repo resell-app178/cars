@@ -75,10 +75,12 @@
     </div>
     
     <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
-      <div style="font-size: 2.5rem; margin-bottom: 8px;">📷</div>
-      <strong style="color: var(--accent-cyan); font-size: 1.1rem;">Odfoť alebo nahraj auto z galérie</strong>
-      <p style="color: var(--text-muted); font-size: 0.8rem; margin: 5px 0 0 0;">AI sama zanalyzuje karosériu, svetlá a kolesá na zistenie presného modelu.</p>
-      <input type="file" id="fileInput" accept="image/*" capture="environment" style="display:none" onchange="processImage(this)">
+      <div style="font-size: 2.5rem; margin-bottom: 8px;">🖼️ / 📸</div>
+      <strong style="color: var(--accent-cyan); font-size: 1.1rem;">Vyber fotku z galérie alebo odfoť auto</strong>
+      <p style="color: var(--text-muted); font-size: 0.8rem; margin: 5px 0 0 0;">Klikni sem pre výber z galérie alebo zapnutie fotoaparátu.</p>
+      
+      <!-- Input bez capture="environment" umožní výber z galérie aj fotoaparát -->
+      <input type="file" id="fileInput" accept="image/png, image/jpeg, image/webp" style="display:none" onchange="processImage(this)">
       
       <div class="preview-container" id="previewContainer">
         <img id="imagePreview" class="preview-img" alt="Car Preview">
@@ -182,7 +184,7 @@
 
   async function runVisionScan() {
     if (!base64Image) {
-      alert("Najprv odfoť alebo nahraj auto!");
+      alert("Najprv vyber fotku z galérie alebo odfoť auto!");
       return;
     }
 
