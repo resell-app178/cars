@@ -1,184 +1,325 @@
-import asyncio
-import json
-from typing import List, Optional
-from fastapi import FastAPI, Depends, HTTPException, File, UploadFile
-from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey, JSON
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session, relationship
-from pydantic import BaseModel
-
-# 1. DATABASE CONFIGURATION (SQLite / PostgreSQL)
-DATABASE_URL = "sqlite:///./autospec_database.db"
-
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
-# --- SQLALCHEMY DATABASE MODELS ---
-
-class DBBrand(Base):
-    __tablename__ = "brands"
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, unique=True, index=True) # e.g. "BMW", "Škoda", "Audi"
-    country = Column(String)
-    models = relationship("DBModel", back_populates="brand_rel", cascade="all, delete")
-
-class DBModel(Base):
-    __tablename__ = "models"
-    id = Column(Integer, primary_key=True, index=True)
-    brand_id = Column(Integer, ForeignKey("brands.id"))
-    name = Column(String, index=True) # e.g. "M3", "Superb", "RS6"
-    brand_rel = relationship("DBBrand", back_populates="models")
-    generations = relationship("DBGeneration", back_populates="model_rel", cascade="all, delete")
-
-class DBGeneration(Base):
-    __tablename__ = "generations"
-    id = Column(Integer, primary_key=True, index=True)
-    model_id = Column(Integer, ForeignKey("models.id"))
-    code = Column(String, index=True) # e.g. "E46", "MK3", "C8"
-    years = Column(String)
-    engine_code = Column(String) # e.g. "S54B32", "2.0 TDI (CRMB)", "DJPB"
-    stock_hp = Column(Integer)
-    stock_nm = Column(Integer)
-    gearbox_type = Column(String) # "Manual", "DSG", "DKG", "Automatic"
-    rarity_score = Column(Float)
-    tuning_stage1 = Column(JSON) # {"hp_gain": 40, "nm_gain": 80, "price_eur": 350}
-    tuning_stage2 = Column(JSON)
-    model_rel = relationship("DBModel", back_populates="generations")
-
-Base.metadata.create_all(bind=engine)
-
-# --- DB SEEDING FUNCTION (Automatické naplnenie dátami pri prvom spustení) ---
-
-def seed_initial_database():
-    db = SessionLocal()
-    try:
-        if db.query(DBBrand).first():
-            return # Databáza už obsahuje dáta
-
-        # Značka 1: BMW
-        bmw = DBBrand(name="BMW", country="Nemecko")
-        m3 = DBModel(name="M3", brand_rel=bmw)
-        m3_e46 = DBGeneration(
-            model_rel=m3, code="E46", years="2000-2006", engine_code="S54B32",
-            stock_hp=343, stock_nm=365, gearbox_type="Manual 6-speed / SMG II",
-            rarity_score=92.5,
-            tuning_stage1={"hp_gain": 22, "nm_gain": 20, "price_eur": 550.0},
-            tuning_stage2={"hp_gain": 45, "nm_gain": 40, "price_eur": 1800.0}
-        )
-
-        # Značka 2: Škoda
-        skoda = DBBrand(name="Škoda", country="Česko")
-        superb = DBModel(name="Superb", brand_rel=skoda)
-        superb_mk3 = DBGeneration(
-            model_rel=superb, code="MK3", years="2015-2023", engine_code="2.0 TDI (CRMB/DFHA)",
-            stock_hp=150, stock_nm=340, gearbox_type="Manual 6-speed",
-            rarity_score=45.0,
-            tuning_stage1={"hp_gain": 40, "nm_gain": 80, "price_eur": 350.0},
-            tuning_stage2={"hp_gain": 65, "nm_gain": 110, "price_eur": 1200.0}
-        )
-
-        # Značka 3: Audi
-        audi = DBBrand(name="Audi", country="Nemecko")
-        rs6 = DBModel(name="RS6", brand_rel=audi)
-        rs6_c8 = DBGeneration(
-            model_rel=rs6, code="C8", years="2019+", engine_code="DJPB 4.0 V8 TFSI",
-            stock_hp=600, stock_nm=800, gearbox_type="Tiptronic 8-speed",
-            rarity_score=95.0,
-            tuning_stage1={"hp_gain": 100, "nm_gain": 150, "price_eur": 1200.0},
-            tuning_stage2={"hp_gain": 180, "nm_gain": 220, "price_eur": 4500.0}
-        )
-
-        db.add_all([bmw, skoda, audi])
-        db.commit()
-        print("✅ Databáza úspešne naplnená základnými značkami a modelmi!")
-    finally:
-        db.close()
-
-# Spustíme seedovanie pri štarte aplikácie
-seed_initial_database()
-
-# --- FASTAPI ENGINE ---
-
-app = FastAPI(title="AutoSpec AI Engine with Seed Database", version="3.1.0")
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-# --- ENDPOINTS FOR DATABASE & SCANNING ---
-
-@app.get("/api/v3/brands")
-def get_all_brands(db: Session = Depends(get_db)):
-    """Vráti zoznam všetkých značiek a ich modelov v databáze"""
-    brands = db.query(DBBrand).all()
-    result = []
-    for b in brands:
-        result.append({
-            "brand": b.name,
-            "country": b.country,
-            "models": [m.name for m in b.models]
-        })
-    return result
-
-@app.get("/api/v3/specs/{brand_name}/{model_name}/{gen_code}")
-def get_vehicle_specs(brand_name: str, model_name: str, gen_code: str, db: Session = Depends(get_db)):
-    """Vyhľadá presné špecifikácie konkrétneho auta v databáze"""
-    vehicle = db.query(DBGeneration).join(DBModel).join(DBBrand).\
-        filter(DBBrand.name.ilike(brand_name)).\
-        filter(DBModel.name.ilike(model_name)).\
-        filter(DBGeneration.code.ilike(gen_code)).first()
-    
-    if not vehicle:
-        raise HTTPException(status_code=404, detail="Vozidlo nebolo nájdené v databáze.")
-
-    return {
-        "brand": vehicle.model_rel.brand_rel.name,
-        "model": vehicle.model_rel.name,
-        "generation": vehicle.code,
-        "engine_code": vehicle.engine_code,
-        "stock_hp": vehicle.stock_hp,
-        "stock_nm": vehicle.stock_nm,
-        "gearbox": vehicle.gearbox_type,
-        "rarity_score": vehicle.rarity_score,
-        "tuning_stage_1": vehicle.tuning_stage1,
-        "tuning_stage_2": vehicle.tuning_stage2
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoSpec AI Ultra v3.0</title>
+  <style>
+    :root {
+      --bg-color: #0B0E14;
+      --card-bg: #131B2E;
+      --border-color: #1E293B;
+      --accent-cyan: #38BDF8;
+      --accent-purple: #A855F7;
+      --accent-green: #22C55E;
+      --text-main: #E2E8F0;
+      --text-muted: #94A3B8;
     }
 
-@app.post("/api/v3/scan")
-async def scan_and_match_db(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db)
-):
-    """Skenovanie fotky s automatickým párovaním na DB záznam"""
-    # 1. Simulácia vision AI rozpoznania z fotky (napr. rozpoznané BMW M3 E46)
-    detected_brand = "BMW"
-    detected_model = "M3"
-    detected_gen = "E46"
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+    }
 
-    # 2. Načítanie skutočných dát z databázy
-    matched = db.query(DBGeneration).join(DBModel).join(DBBrand).\
-        filter(DBBrand.name == detected_brand).\
-        filter(DBModel.name == detected_model).\
-        filter(DBGeneration.code == detected_gen).first()
+    .container {
+      max-width: 800px;
+      width: 100%;
+    }
 
-    if not matched:
-        return {"status": "recognized_but_not_in_db", "detected": f"{detected_brand} {detected_model} {detected_gen}"}
+    header {
+      border-bottom: 2px solid var(--border-color);
+      padding-bottom: 15px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
 
-    return {
-        "status": "success",
-        "matched_from_db": True,
-        "data": {
-            "brand": matched.model_rel.brand_rel.name,
-            "model": matched.model_rel.name,
-            "generation": matched.code,
-            "engine": matched.engine_code,
-            "stock_hp": matched.stock_hp,
-            "stock_nm": matched.stock_nm,
-            "rarity_index": matched.rarity_score,
-            "stage_1_tuning": matched.tuning_stage1
+    h1 {
+      margin: 0;
+      font-size: 1.8rem;
+      color: #FFF;
+    }
+
+    .badge {
+      background: #0F172A;
+      border: 1px solid var(--accent-cyan);
+      color: var(--accent-cyan);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: bold;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: bold;
+      margin-bottom: 15px;
+      color: var(--accent-cyan);
+      text-transform: uppercase;
+    }
+
+    .form-group {
+      margin-bottom: 15px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 5px;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    select, input[type="file"], button {
+      width: 100%;
+      padding: 10px;
+      background: #07090E;
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      border-radius: 6px;
+      box-sizing: border-box;
+      font-size: 1rem;
+    }
+
+    button {
+      background: linear-gradient(135deg, #0284C7, #0369A1);
+      color: white;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      margin-top: 10px;
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    .results {
+      display: none;
+      margin-top: 20px;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+      margin-top: 15px;
+    }
+
+    .stat-box {
+      background: #07090E;
+      border: 1px solid var(--border-color);
+      padding: 12px;
+      border-radius: 6px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 1.4rem;
+      font-weight: bold;
+      color: var(--accent-cyan);
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .tuning-box {
+      border-left: 4px solid var(--accent-purple);
+      background: #07090E;
+      padding: 10px 15px;
+      margin-top: 10px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div>
+        <h1>AutoSpec AI <span style="color: var(--accent-cyan)">v3.0</span></h1>
+        <div style="color: var(--accent-cyan); font-size: 0.8rem; font-weight: bold;">WEB CLIENT ENGINE</div>
+      </div>
+      <span class="badge">GITHUB PAGES LIVE</span>
+    </header>
+
+    <!-- FORM CARD -->
+    <div class="card">
+      <div class="card-title">🔍 Skenovanie & Databáza Vozidiel</div>
+      
+      <div class="form-group">
+        <label for="brandSelect">Vyber Značku:</label>
+        <select id="brandSelect" onchange="updateModels()">
+          <option value="">-- Vyber značku --</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="modelSelect">Vyber Model & Generáciu:</label>
+        <select id="modelSelect">
+          <option value="">-- Najprv vyber značku --</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="fileInput">Nahraj fotku auta (Simulácia Vision AI):</label>
+        <input type="file" id="fileInput" accept="image/*">
+      </div>
+
+      <button onclick="analyzeVehicle()">SPUSTIŤ ANALÝZU</button>
+    </div>
+
+    <!-- RESULTS CARD -->
+    <div class="card results" id="resultsCard">
+      <div class="card-title" style="color: var(--accent-green)">⚡ Výsledky Analýzy</div>
+      
+      <div id="vehicleTitle" style="font-size: 1.4rem; font-weight: bold; margin-bottom: 10px;"></div>
+
+      <div class="stat-grid">
+        <div class="stat-box">
+          <div class="stat-label">Sériový Výkon</div>
+          <div class="stat-value" id="stockHp">-</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Kód Motora</div>
+          <div class="stat-value" style="color: var(--accent-purple);" id="engineCode">-</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Rarity Index</div>
+          <div class="stat-value" style="color: var(--accent-green);" id="rarityScore">-</div>
+        </div>
+      </div>
+
+      <h3 style="margin-top: 20px; color: var(--text-main);">🚀 Možnosti Úpravy (Tuning Stages)</h3>
+      
+      <div class="tuning-box">
+        <strong style="color: var(--accent-cyan)">Stage 1 Chiptuning</strong>
+        <div id="stage1Details" style="margin-top: 5px; color: var(--text-muted);"></div>
+      </div>
+
+      <div class="tuning-box" style="border-left-color: var(--accent-green);">
+        <strong style="color: var(--accent-green)">Stage 2 Performance</strong>
+        <div id="stage2Details" style="margin-top: 5px; color: var(--text-muted);"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ZÁKLADNÁ DATABÁZA V JAVASCRIPTE
+    const database = {
+      "BMW": [
+        {
+          model: "M3 E46 (2000-2006)",
+          engine: "S54B32",
+          stockHp: "343 HP / 365 Nm",
+          rarity: "92.5%",
+          stage1: "+22 HP, +20 Nm (Cena cca 550 €)",
+          stage2: "+45 HP, +40 Nm + Carbon Airbox (Cena cca 1 800 €)"
+        },
+        {
+          model: "M5 E60 (2005-2010)",
+          engine: "S85B50 V10",
+          stockHp: "507 HP / 520 Nm",
+          rarity: "94.0%",
+          stage1: "+30 HP, +35 Nm (Cena cca 650 €)",
+          stage2: "+60 HP, +60 Nm + Decat Exhaust (Cena cca 2 500 €)"
         }
+      ],
+      "Škoda": [
+        {
+          model: "Superb MK3 2.0 TDI (2015-2023)",
+          engine: "CRMB / DFHA",
+          stockHp: "150 HP / 340 Nm",
+          rarity: "45.0%",
+          stage1: "+40 HP, +80 Nm (Cena cca 350 €)",
+          stage2: "+65 HP, +110 Nm + Downpipe (Cena cca 1 200 €)"
+        },
+        {
+          model: "Octavia RS 2.0 TSI (2020+)",
+          engine: "DNPA",
+          stockHp: "245 HP / 370 Nm",
+          rarity: "65.0%",
+          stage1: "+55 HP, +80 Nm (Cena cca 450 €)",
+          stage2: "+90 HP, +130 Nm + Intercooler (Cena cca 2 000 €)"
+        }
+      ],
+      "Audi": [
+        {
+          model: "RS6 C8 (2019+)",
+          engine: "DJPB 4.0 V8 TFSI",
+          stockHp: "600 HP / 800 Nm",
+          rarity: "95.0%",
+          stage1: "+100 HP, +150 Nm (Cena cca 1 200 €)",
+          stage2: "+180 HP, +220 Nm + Exhaust System (Cena cca 4 500 €)"
+        }
+      ]
+    };
+
+    // INICIALIZÁCIA ZNAČIEK
+    window.onload = function() {
+      const brandSelect = document.getElementById("brandSelect");
+      for (let brand in database) {
+        let opt = document.createElement("option");
+        opt.value = brand;
+        opt.innerHTML = brand;
+        brandSelect.appendChild(opt);
+      }
+    };
+
+    // AKTUALIZÁCIA MODELOV PODĽA ZNAČKY
+    function updateModels() {
+      const brandSelect = document.getElementById("brandSelect").value;
+      const modelSelect = document.getElementById("modelSelect");
+      modelSelect.innerHTML = '<option value="">-- Vyber model --</option>';
+
+      if (brandSelect && database[brandSelect]) {
+        database[brandSelect].forEach((item, index) => {
+          let opt = document.createElement("option");
+          opt.value = index;
+          opt.innerHTML = item.model;
+          modelSelect.appendChild(opt);
+        });
+      }
     }
+
+    // VYHODNOTENIE
+    function analyzeVehicle() {
+      const brand = document.getElementById("brandSelect").value;
+      const modelIndex = document.getElementById("modelSelect").value;
+
+      if (!brand || modelIndex === "") {
+        alert("Prosím vyber značku a model!");
+        return;
+      }
+
+      const data = database[brand][modelIndex];
+
+      document.getElementById("vehicleTitle").innerText = `${brand} ${data.model}`;
+      document.getElementById("stockHp").innerText = data.stockHp;
+      document.getElementById("engineCode").innerText = data.engine;
+      document.getElementById("rarityScore").innerText = data.rarity;
+      document.getElementById("stage1Details").innerText = data.stage1;
+      document.getElementById("stage2Details").innerText = data.stage2;
+
+      document.getElementById("resultsCard").style.display = "block";
+    }
+  </script>
+</body>
+</html>
